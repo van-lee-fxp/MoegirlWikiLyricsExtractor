@@ -44,10 +44,26 @@ const $ele = ( name = "div", options = null ) => {
 const $text = doc.createTextNode.bind ( doc );
 const $frag = doc.createDocumentFragment.bind ( doc );
 
+function debounce ( func, duration = 500 ) {
+    let timerId;
+    return function ( ...args ) {
+        clearTimeout ( timerId );
+        timerId = setTimeout ( ( ) => {
+            func.apply ( this, args );
+        }, duration );
+    };
+}
+
 GM_addStyle (`
     body.prevent-scroll {
         position: fixed;
         background-attachment: fixed;
+        top: var(--dy);
+        left: var(--dx);
+        background-position-x: var(--dx);
+        background-position-y: var(--dy);
+        width: var(--w);
+        height: var(--h);
     }
 
     dialog.fxp-plugin {
@@ -378,12 +394,6 @@ GM_addStyle (`
     dialog.querySelector ( "#mg-lyrics_button-close" ).onclick = ( ) => { 
         dialog.close ( );
         doc.body.classList.remove ( "prevent-scroll" );
-        Object.assign ( doc.body.style, {
-            backgroundPositionX: "",
-            backgroundPositionY: "",
-            width: "",
-            height: "",
-        } );
         doc.documentElement.scrollTo ( -dx, -dy );
     }
 
@@ -440,16 +450,25 @@ GM_addStyle (`
         [ dx, dy ] = [ rect.x, rect.y ];
         dialog.showModal ( );
         doc.body.classList.add ( "prevent-scroll" );
-        Object.assign ( doc.body.style, {
-            top: `${dy}px`,
-            left: `${dx}px`,
-            backgroundPositionX: `${dx}px`,
-            backgroundPositionY: `${dy}px`,
-            width: `${rect.width}px`,
-            height: `${rect.height}px`
-        } );
+        Object.entries ( {
+            "--dx": `${dx}px`,
+            "--dy": `${dy}px`,
+            "--w": `${rect.width}px`,
+            "--h": `${rect.height}px`,
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
         if ( lyricsData == null ) { initDialog ( ); }
     };
+
+    window.onresize = debounce ( ( ) => {
+        doc.body.classList.remove ( "prevent-scroll" );
+        doc.documentElement.scrollTo ( -dx, -dy );
+        const rect = doc.body.getBoundingClientRect ( );
+        Object.entries ( {
+            "--w": `${rect.width}px`,
+            "--h": `${rect.height}px`,
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+        doc.body.classList.add ( "prevent-scroll" );
+    }, 200 );
 
     GM_addStyle (`
         dialog#mg-lyrics_dialog[data-color-mode="dark"] {
