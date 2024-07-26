@@ -393,6 +393,7 @@ GM_addStyle (`
 
     dialog.querySelector ( "#mg-lyrics_button-close" ).onclick = ( ) => { 
         dialog.close ( );
+        window.onresize = null;
         doc.body.classList.remove ( "prevent-scroll" );
         doc.documentElement.scrollTo ( -dx, -dy );
     }
@@ -445,6 +446,17 @@ GM_addStyle (`
         } );
     }
 
+    const preventScrollOnResize = debounce ( ( ) => {
+        doc.body.classList.remove ( "prevent-scroll" );
+        doc.documentElement.scrollTo ( -dx, -dy );
+        const rect = doc.body.getBoundingClientRect ( );
+        Object.entries ( {
+            "--w": `${rect.width}px`,
+            "--h": `${rect.height}px`,
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+        doc.body.classList.add ( "prevent-scroll" );
+    }, 200 );
+
     doc.querySelector ( "#mg-lyrics_link" ).onclick = ( ) => {
         const rect = doc.body.getBoundingClientRect ( );
         [ dx, dy ] = [ rect.x, rect.y ];
@@ -456,19 +468,9 @@ GM_addStyle (`
             "--w": `${rect.width}px`,
             "--h": `${rect.height}px`,
         } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+        window.onresize = preventScrollOnResize;
         if ( lyricsData == null ) { initDialog ( ); }
     };
-
-    window.onresize = debounce ( ( ) => {
-        doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -dx, -dy );
-        const rect = doc.body.getBoundingClientRect ( );
-        Object.entries ( {
-            "--w": `${rect.width}px`,
-            "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-        doc.body.classList.add ( "prevent-scroll" );
-    }, 200 );
 
     GM_addStyle (`
         dialog#mg-lyrics_dialog[data-color-mode="dark"] {
