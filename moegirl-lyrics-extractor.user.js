@@ -12,12 +12,6 @@
 
 // General Purpose Variables and Functions ========================
 
-const COLOR_MODE = {
-    DARK: 2,
-    LIGHT: 1,
-    AUTO: 0,
-}
-
 const doc = document;
 
 const $ele = ( name = "div", options = null ) => {
@@ -48,17 +42,6 @@ const $ele = ( name = "div", options = null ) => {
 
 const $text = doc.createTextNode.bind ( doc );
 const $frag = doc.createDocumentFragment.bind ( doc );
-
-// 使得元素的部分方法调用后返回元素自身，实现链式调用
-for ( const func_name of [ "prepend", "append", "replaceChildren" ] ) {
-    for ( const type of [ Element, DocumentFragment ] ) {
-        const temp_func = type.prototype [ func_name ];
-        type.prototype [ func_name ] = function ( ...args ) {
-            temp_func.call ( this, ...args );
-            return this;
-        }
-    }
-}
 
 GM_addStyle (`
     dialog.fxp-plugin {
