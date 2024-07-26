@@ -45,6 +45,11 @@ const $text = doc.createTextNode.bind ( doc );
 const $frag = doc.createDocumentFragment.bind ( doc );
 
 GM_addStyle (`
+    body.prevent-scroll {
+        position: fixed;
+        background-attachment: fixed;
+    }
+
     dialog.fxp-plugin {
         --shadow-color: rgb(0 0 0 / 25%);
         --fg-success: #00b42a;
@@ -95,7 +100,7 @@ GM_addStyle (`
         backdrop-filter: blur(3px);
     }
 
-    dialog.fxp-plugin .fxp-variant_success {
+    dialog.fxp-plugin .variant_success {
         color: var(--fg-success);
     }
     
@@ -346,7 +351,7 @@ GM_addStyle (`
         </footer>
     </div>
     <div class="popover" id="mg-lyrics_popover-success">
-        <i class="ri-checkbox-circle-fill fxp-variant_success"></i>
+        <i class="ri-checkbox-circle-fill variant_success"></i>
         复制成功
     </div>
     `;
@@ -372,8 +377,9 @@ GM_addStyle (`
 
     dialog.querySelector ( "#mg-lyrics_button-close" ).onclick = ( ) => { 
         dialog.close ( );
-        doc.documentElement.style.overflow = "";
-        doc.documentElement.style.transform = "";
+        doc.body.classList.remove ( "prevent-scroll" );
+        doc.body.style.backgroundPositionX = "";
+        doc.body.style.backgroundPositionY = "";
         doc.documentElement.scrollTo ( -dx, -dy );
     }
 
@@ -426,12 +432,14 @@ GM_addStyle (`
     }
 
     doc.querySelector ( "#mg-lyrics_link" ).onclick = ( ) => {
-        dialog.showModal ( );
         const rect = doc.body.getBoundingClientRect ( );
-        dx = rect.x; dy = rect.y;
-        doc.documentElement.style.transform = `translate(${dx}px, ${dy}px)`;
-        doc.documentElement.style.overflow = "hidden";
-        doc.documentElement.scrollTo ( -dx, -dy );
+        [ dx, dy ] = [ rect.x, rect.y ];
+        dialog.showModal ( );
+        doc.body.classList.add ( "prevent-scroll" );
+        doc.body.style.top = `${dy}px`; 
+        doc.body.style.left = `${dx}px`;
+        doc.body.style.backgroundPositionX = `${dx}px`;
+        doc.body.style.backgroundPositionY = `${dy}px`;
         if ( lyricsData == null ) { initDialog ( ); }
     };
 
