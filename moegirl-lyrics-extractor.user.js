@@ -312,7 +312,7 @@ GM_addStyle (`
                 <strong>萌娘百科歌词提取助手</strong>
             </div>
             <div class="buttons">
-                <button title="访问 GitHub 项目页">
+                <button id="mg-lyrics_button-github" title="访问 GitHub 项目页">
                     <i class="ri-github-fill"></i>
                 </button>
                 <button id="mg-lyrics_button-close" class="close" title="关闭">
@@ -355,6 +355,9 @@ GM_addStyle (`
         doc.documentElement.style.overflow = "";
         doc.documentElement.style.transform = "";
         doc.documentElement.scrollTo ( -dx, -dy );
+    }
+    dialog.querySelector ( "#mg-lyrics_button-github" ).onclick = ( ) => {
+        window.open ( "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor" );
     }
 
     let lyricsData = null;
