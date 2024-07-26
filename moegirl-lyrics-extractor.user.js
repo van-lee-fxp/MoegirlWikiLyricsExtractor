@@ -378,8 +378,12 @@ GM_addStyle (`
     dialog.querySelector ( "#mg-lyrics_button-close" ).onclick = ( ) => { 
         dialog.close ( );
         doc.body.classList.remove ( "prevent-scroll" );
-        doc.body.style.backgroundPositionX = "";
-        doc.body.style.backgroundPositionY = "";
+        Object.assign ( doc.body.style, {
+            backgroundPositionX: "",
+            backgroundPositionY: "",
+            width: "",
+            height: "",
+        } );
         doc.documentElement.scrollTo ( -dx, -dy );
     }
 
@@ -436,10 +440,14 @@ GM_addStyle (`
         [ dx, dy ] = [ rect.x, rect.y ];
         dialog.showModal ( );
         doc.body.classList.add ( "prevent-scroll" );
-        doc.body.style.top = `${dy}px`; 
-        doc.body.style.left = `${dx}px`;
-        doc.body.style.backgroundPositionX = `${dx}px`;
-        doc.body.style.backgroundPositionY = `${dy}px`;
+        Object.assign ( doc.body.style, {
+            top: `${dy}px`,
+            left: `${dx}px`,
+            backgroundPositionX: `${dx}px`,
+            backgroundPositionY: `${dy}px`,
+            width: `${rect.width}px`,
+            height: `${rect.height}px`
+        } );
         if ( lyricsData == null ) { initDialog ( ); }
     };
 
