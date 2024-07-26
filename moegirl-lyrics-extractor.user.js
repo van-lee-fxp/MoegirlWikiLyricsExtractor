@@ -8,6 +8,7 @@
 // @match        https://*.moegirl.org.cn/*
 // @icon         https://img.moegirl.org.cn/favicon.ico
 // @grant        GM_addStyle
+// @grant        GM_setClipboard
 // ==/UserScript==
 
 // General Purpose Variables and Functions ========================
@@ -46,6 +47,9 @@ const $frag = doc.createDocumentFragment.bind ( doc );
 GM_addStyle (`
     dialog.fxp-plugin {
         --shadow-color: rgb(0 0 0 / 25%);
+        --fg-success: #00b42a;
+        --bg-error: #e81123;
+
         inline-size: 50%;
         block-size: 75%;
         box-sizing: border-box;
@@ -56,6 +60,7 @@ GM_addStyle (`
         color: var(--text-100);
         background-color: var(--bg-100);
         filter: drop-shadow(0 0 30px var(--shadow-color));
+        position: relative;
         /*overflow: visible;*/
     }
 
@@ -88,6 +93,26 @@ GM_addStyle (`
     dialog.fxp-plugin::backdrop {
         background-color: rgb(0 0 0 / 25%);
         backdrop-filter: blur(3px);
+    }
+
+    dialog.fxp-plugin .fxp-variant_success {
+        color: var(--fg-success);
+    }
+    
+    dialog.fxp-plugin > .popover {
+        display: none;
+        position: absolute;
+        border-radius: 5px;
+        padding: 20px;
+        background-color: var(--bg-200);
+        border: 1px solid var(--bg-300);
+        bottom: 20px;
+        right: 20px;
+        filter: drop-shadow(0 0 10px var(--shadow-color));
+    }
+
+    dialog.fxp-plugin > .popover.showing {
+        display: block;
     }
 
     dialog.fxp-plugin i[class^="ri-"] {
@@ -257,7 +282,8 @@ GM_addStyle (`
         const toolbar = doc.querySelector ( "#moe-global-toolbar.desktop-only" );
         toolbar.querySelector ( "#p-tb" ).innerHTML += `
             <li class="toolbar-link" data-v-f0c8232e>
-                <a id="mg-lyrics_link" 
+                <a 
+                    id="mg-lyrics_link" 
                     title="一键提取 LyricsKai 模板歌词" 
                     href="#" data-v-f0c8232e
                 >
@@ -279,7 +305,8 @@ GM_addStyle (`
         `;
     }
 
-    // Building up dialog for the lyrics tool
+    // Building up main dialog for the lyrics tool
+
     const dialog = $ele ( 
         "dialog", { 
         id: "mg-lyrics_dialog", 
@@ -318,32 +345,54 @@ GM_addStyle (`
             </div>
         </footer>
     </div>
+    <div class="popover" id="mg-lyrics_popover-success">
+        <i class="ri-checkbox-circle-fill fxp-variant_success"></i>
+        复制成功
+    </div>
     `;
     doc.body.append ( dialog );
-    doc.body.append ( $ele ( "div", { cls: "cannot-scroll_mask" } ) );
+
+    // Switch color mode according to system settings
+
     const colorMediaQuery = matchMedia ( "(prefers-color-scheme: dark)" );
     const colorModeAuto = ( ) => {
         dialog.dataset.colorMode = colorMediaQuery.matches ? "dark" : "light";
-    }
+    };
     colorMediaQuery.addEventListener ( "change", colorModeAuto );
     colorModeAuto ( );
+
+    // reference of key elements
 
     const lyricsCount = dialog.querySelector ( "#mg-lyrics_count" );
     const tabsArea = dialog.querySelector ( "#mg-lyrics_tabs" );
     const previewArea = dialog.querySelector ( "#mg-lyrics_preview" );
+    const popover = dialog.querySelector ( "#mg-lyrics_popover-success" );
 
-    let dx = 0; let dy = 0;
+    let dx = 0, dy = 0, lyricsData = null, timeoutId = null;
+
     dialog.querySelector ( "#mg-lyrics_button-close" ).onclick = ( ) => { 
         dialog.close ( );
         doc.documentElement.style.overflow = "";
         doc.documentElement.style.transform = "";
         doc.documentElement.scrollTo ( -dx, -dy );
     }
+
     dialog.querySelector ( "#mg-lyrics_button-github" ).onclick = ( ) => {
         window.open ( "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor" );
     }
 
-    let lyricsData = null;
+    const showPopover = ( ) => {
+        if ( timeoutId != null ) { // popover already showing
+            clearTimeout ( timeoutId );
+        } else {
+            popover.classList.add ( "showing" );
+        }
+        timeoutId = setTimeout ( ( ) => {
+            popover.classList.remove ( "showing" );
+            timeoutId = null;
+        }, 1500 );
+    };
+
     const initDialog = ( ) => {
         lyricsData = getPageLyrics ( );
         lyricsCount.innerText = lyricsData.length.toString ( );
@@ -369,7 +418,8 @@ GM_addStyle (`
                 const textarea = lyrics_box.querySelector ( "textarea" );
                 textarea.append ( lyrics_src );
                 lyrics_box.querySelector ( ".lyrics-copy-button" ).onclick = ( ) => {
-                    navigator.clipboard.writeText ( textarea.textContent );
+                    GM_setClipboard ( textarea.textContent );
+                    showPopover ( );
                 };
             } );
         } );
@@ -397,7 +447,6 @@ GM_addStyle (`
             --bg-100:#1E1E1E;
             --bg-200:#2d2d2d;
             --bg-300:#454545;
-            --bg-error: #e81123;
         }
 
         dialog#mg-lyrics_dialog[data-color-mode="light"] {
