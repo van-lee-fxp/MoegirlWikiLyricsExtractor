@@ -71,6 +71,44 @@ function throttle ( func, duration = 500 ) {
     }
 }
 
+// Prevent and Recover Scroll ------------------------
+
+class ScrollControl {
+    static #dx = 0;
+    static #dy = 0;
+
+    static #scrollBack ( ) {
+        doc.body.classList.remove ( "prevent-scroll" );
+        doc.documentElement.scrollTo ( -ScrollControl.#dx, -ScrollControl.#dy );
+    }
+
+    static preventScroll ( debounceDuration = 200 ) {
+        const rect = doc.body.getBoundingClientRect ( );
+        [ ScrollControl.#dx, ScrollControl.#dy ] = [ rect.x, rect.y ];
+        doc.body.classList.add ( "prevent-scroll" );
+        Object.entries ( {
+            "--dx": `${ScrollControl.#dx}px`,
+            "--dy": `${ScrollControl.#dy}px`,
+            "--w": `${rect.width}px`,
+            "--h": `${rect.height}px`,
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+        window.onresize = debounce ( ( ) => {
+            ScrollControl.#scrollBack ( );
+            const rect = doc.body.getBoundingClientRect ( );
+            Object.entries ( {
+                "--w": `${rect.width}px`,
+                "--h": `${rect.height}px`,
+            } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+            doc.body.classList.add ( "prevent-scroll" );
+        }, debounceDuration );
+    }
+
+    static recoverScroll ( ) {
+        window.onresize = null;
+        ScrollControl.#scrollBack ( );
+    }
+}
+
 // General-Purpose Styles ------------------------
 
 GM_addStyle (`
@@ -101,6 +139,7 @@ GM_addStyle (`
         background-color: var(--bg-100);
         filter: drop-shadow(0 0 30px var(--shadow-color));
         position: relative;
+        user-select: none;
         /*overflow: visible;*/
     }
 
@@ -310,40 +349,6 @@ GM_addStyle (`
         return Array.from ( findLyricsBlocks ( ) ).map ( ele => extractLyrics ( ele ) );
     }
 
-    // Prevent and Recover Scroll ------------------------
-
-    let dx = 0, dy = 0;
-
-    const preventScrollOnResize = debounce ( ( ) => {
-        doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -dx, -dy );
-        const rect = doc.body.getBoundingClientRect ( );
-        Object.entries ( {
-            "--w": `${rect.width}px`,
-            "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-        doc.body.classList.add ( "prevent-scroll" );
-    }, 200 );
-
-    function preventScroll ( ) {
-        const rect = doc.body.getBoundingClientRect ( );
-        [ dx, dy ] = [ rect.x, rect.y ];
-        doc.body.classList.add ( "prevent-scroll" );
-        Object.entries ( {
-            "--dx": `${dx}px`,
-            "--dy": `${dy}px`,
-            "--w": `${rect.width}px`,
-            "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-        window.onresize = preventScrollOnResize;
-    }
-
-    function recoverScroll ( ) {
-        window.onresize = null;
-        doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -dx, -dy );
-    }
-
     // Main Program ========================
 
     // DOM Setup ------------------------
@@ -395,7 +400,7 @@ GM_addStyle (`
     dialog.innerHTML = `
     <div id="mg-lyrics_window" class="dialog-window">
         <header id="mg-lyrics_header">
-            <div class="content">
+            <div class="content" draggable = "true">
                 <strong>萌娘百科歌词提取助手</strong>
             </div>
             <div class="buttons">
@@ -428,6 +433,14 @@ GM_addStyle (`
     </div>
     `;
     doc.body.append ( dialog );
+
+    dialog.ondragstart = ( e ) => {
+        //console.log ( e );
+    }
+
+    dialog.ondragover = ( e ) => {
+        //console.log ( e );
+    }
 
     // Important Elements ------------------------
 
@@ -501,7 +514,7 @@ GM_addStyle (`
 
     // Entrance to the tool clicked
     doc.querySelector ( "#mg-lyrics_link" ).onclick = ( ) => {
-        preventScroll ( );
+        ScrollControl.preventScroll ( );
         dialog.showModal ( );
         if ( lyricsData == null ) { initDialog ( ); }
     };
@@ -509,7 +522,7 @@ GM_addStyle (`
     // Close dialog
     dialog.querySelector ( "button.close" ).onclick = ( ) => { 
         dialog.close ( );
-        recoverScroll ( );
+        ScrollControl.recoverScroll ( );
     }
 
     // Link to GitHub repo
