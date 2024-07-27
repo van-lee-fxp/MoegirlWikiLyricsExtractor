@@ -11,7 +11,9 @@
 // @grant        GM_setClipboard
 // ==/UserScript==
 
-// General Purpose Variables and Functions ========================
+// General-Purpose Code ========================
+
+// General-Purpose Variables and Functions ------------------------
 
 const doc = document;
 
@@ -48,11 +50,28 @@ function debounce ( func, duration = 500 ) {
     let timerId;
     return function ( ...args ) {
         clearTimeout ( timerId );
-        timerId = setTimeout ( ( ) => {
-            func.apply ( this, args );
-        }, duration );
+        timerId = setTimeout ( 
+            ( ) => { func.apply ( this, args ); }, 
+            duration 
+        );
     };
 }
+
+function throttle ( func, duration = 500 ) {
+    let timerId = null;
+    return function ( ...args ) {
+        if ( timerId != null ) { return; }
+        timerId = setTimeout ( 
+            ( ) => { 
+                func.apply ( this, args );
+                timerId = null;
+            }, 
+            duration 
+        );
+    }
+}
+
+// General-Purpose Styles ------------------------
 
 GM_addStyle (`
     body.prevent-scroll {
@@ -211,12 +230,12 @@ GM_addStyle (`
     }
     
     dialog.fxp-plugin > .dialog-window > :is(header, footer) > .buttons > 
-    :is(button, .toggle-button):hover {
+    button:hover {
         background-color: var(--bg-200);
     }
 
     dialog.fxp-plugin > .dialog-window > header > .buttons > 
-    button.close-button, 
+    button.close, 
     dialog.fxp-plugin textarea:focus {
         color: var(--text-100);
     }
@@ -241,6 +260,10 @@ GM_addStyle (`
 
 ( function ( ) {
     'use strict';
+
+    // Auxiliary Functions ========================
+    
+    // Convert Lyrics to Pure Text ------------------------
 
     function findLyricsBlocks ( ) {
         return doc.querySelectorAll ( ".Lyrics" );
@@ -287,17 +310,51 @@ GM_addStyle (`
         return Array.from ( findLyricsBlocks ( ) ).map ( ele => extractLyrics ( ele ) );
     }
 
-    // Start of the Main Program ========================
+    // Prevent and Recover Scroll ------------------------
 
-    console.log ( "MoegirlPedia Lyrics Extractor: Started!" );
+    let dx = 0, dy = 0;
 
-    // add RemixIcon to HTML Head
+    const preventScrollOnResize = debounce ( ( ) => {
+        doc.body.classList.remove ( "prevent-scroll" );
+        doc.documentElement.scrollTo ( -dx, -dy );
+        const rect = doc.body.getBoundingClientRect ( );
+        Object.entries ( {
+            "--w": `${rect.width}px`,
+            "--h": `${rect.height}px`,
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+        doc.body.classList.add ( "prevent-scroll" );
+    }, 200 );
+
+    function preventScroll ( ) {
+        const rect = doc.body.getBoundingClientRect ( );
+        [ dx, dy ] = [ rect.x, rect.y ];
+        doc.body.classList.add ( "prevent-scroll" );
+        Object.entries ( {
+            "--dx": `${dx}px`,
+            "--dy": `${dy}px`,
+            "--w": `${rect.width}px`,
+            "--h": `${rect.height}px`,
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
+        window.onresize = preventScrollOnResize;
+    }
+
+    function recoverScroll ( ) {
+        window.onresize = null;
+        doc.body.classList.remove ( "prevent-scroll" );
+        doc.documentElement.scrollTo ( -dx, -dy );
+    }
+
+    // Main Program ========================
+
+    // DOM Setup ------------------------
+
+    // Add RemixIcon to HTML Head
     doc.head.append ( $ele ( "link", {
         href: "https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css",
         rel: "stylesheet",
     } ) );
 
-    // Adding entrance to the tool for different skins
+    // Add entrance to the tool according to different skins
     if ( doc.body.classList.contains ( "skin-moeskin" ) ) {
         // MoeSkin
         const toolbar = doc.querySelector ( "#moe-global-toolbar.desktop-only" );
@@ -326,8 +383,7 @@ GM_addStyle (`
         `;
     }
 
-    // Building up main dialog for the lyrics tool
-
+    // Build up dialog for the tool
     const dialog = $ele ( 
         "dialog", { 
         id: "mg-lyrics_dialog", 
@@ -373,47 +429,44 @@ GM_addStyle (`
     `;
     doc.body.append ( dialog );
 
-    // Switch color mode according to system settings
-
-    const colorMediaQuery = matchMedia ( "(prefers-color-scheme: dark)" );
-    const colorModeAuto = ( ) => {
-        dialog.dataset.colorMode = colorMediaQuery.matches ? "dark" : "light";
-    };
-    colorMediaQuery.addEventListener ( "change", colorModeAuto );
-    colorModeAuto ( );
-
-    // reference of key elements
+    // Important Elements ------------------------
 
     const lyricsCount = dialog.querySelector ( "#mg-lyrics_count" );
     const tabsArea = dialog.querySelector ( "#mg-lyrics_tabs" );
     const previewArea = dialog.querySelector ( "#mg-lyrics_preview" );
     const popover = dialog.querySelector ( "#mg-lyrics_popover-success" );
 
-    let dx = 0, dy = 0, lyricsData = null, timeoutId = null;
+    // Color Mode ------------------------
 
-    dialog.querySelector ( "#mg-lyrics_button-close" ).onclick = ( ) => { 
-        dialog.close ( );
-        window.onresize = null;
-        doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -dx, -dy );
-    }
+    const colorMediaQuery = matchMedia ( "(prefers-color-scheme: dark)" );
+    const setColorMode = ( ) => {
+        dialog.dataset.colorMode = colorMediaQuery.matches ? "dark" : "light";
+    }; // Switch color mode according to system settings
+    colorMediaQuery.addEventListener ( "change", setColorMode );
+    setColorMode ( );
 
-    dialog.querySelector ( "#mg-lyrics_button-github" ).onclick = ( ) => {
-        window.open ( "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor" );
-    }
+    // "Copied" Notification ------------------------
 
-    const showPopover = ( ) => {
-        if ( timeoutId != null ) { // popover already showing
-            clearTimeout ( timeoutId );
-        } else {
-            popover.classList.add ( "showing" );
-        }
-        timeoutId = setTimeout ( ( ) => {
-            popover.classList.remove ( "showing" );
-            timeoutId = null;
-        }, 1500 );
+    let timerId;
+
+    const closePopover = ( ) => {
+        popover.classList.remove ( "showing" );
+        timerId = null;
     };
 
+    const showPopover = ( ) => {
+        popover.classList.add ( "showing" );
+        clearTimeout ( timerId );
+        timerId = setTimeout ( closePopover, 1500 );
+    };
+
+    popover.onclick = closePopover;
+
+    // Dialog Operations ------------------------
+
+    let lyricsData = null;
+
+    // Building up lyrics content
     const initDialog = ( ) => {
         lyricsData = getPageLyrics ( );
         lyricsCount.innerText = lyricsData.length.toString ( );
@@ -446,31 +499,25 @@ GM_addStyle (`
         } );
     }
 
-    const preventScrollOnResize = debounce ( ( ) => {
-        doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -dx, -dy );
-        const rect = doc.body.getBoundingClientRect ( );
-        Object.entries ( {
-            "--w": `${rect.width}px`,
-            "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-        doc.body.classList.add ( "prevent-scroll" );
-    }, 200 );
-
+    // Entrance to the tool clicked
     doc.querySelector ( "#mg-lyrics_link" ).onclick = ( ) => {
-        const rect = doc.body.getBoundingClientRect ( );
-        [ dx, dy ] = [ rect.x, rect.y ];
+        preventScroll ( );
         dialog.showModal ( );
-        doc.body.classList.add ( "prevent-scroll" );
-        Object.entries ( {
-            "--dx": `${dx}px`,
-            "--dy": `${dy}px`,
-            "--w": `${rect.width}px`,
-            "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-        window.onresize = preventScrollOnResize;
         if ( lyricsData == null ) { initDialog ( ); }
     };
+
+    // Close dialog
+    dialog.querySelector ( "button.close" ).onclick = ( ) => { 
+        dialog.close ( );
+        recoverScroll ( );
+    }
+
+    // Link to GitHub repo
+    dialog.querySelector ( "#mg-lyrics_button-github" ).onclick = ( ) => {
+        window.open ( "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor" );
+    }
+
+    // Additional Stylesheet ------------------------
 
     GM_addStyle (`
         dialog#mg-lyrics_dialog[data-color-mode="dark"] {
