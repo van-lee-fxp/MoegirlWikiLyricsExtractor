@@ -76,37 +76,54 @@ function throttle ( func, duration = 500 ) {
 class ScrollControl {
     static #dx = 0;
     static #dy = 0;
+    static #handleResize = null;
+    static #scrollable = true;
 
     static #scrollBack ( ) {
         doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -ScrollControl.#dx, -ScrollControl.#dy );
+        doc.documentElement.scrollTo ( -this.#dx, -this.#dy );
     }
 
-    static preventScroll ( debounceDuration = 200 ) {
+    static #updateSize ( ) {
+        ScrollControl.#scrollBack ( ); // not `this.#scrollBack()`
         const rect = doc.body.getBoundingClientRect ( );
-        [ ScrollControl.#dx, ScrollControl.#dy ] = [ rect.x, rect.y ];
-        doc.body.classList.add ( "prevent-scroll" );
         Object.entries ( {
-            "--dx": `${ScrollControl.#dx}px`,
-            "--dy": `${ScrollControl.#dy}px`,
             "--w": `${rect.width}px`,
             "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-        window.onresize = debounce ( ( ) => {
-            ScrollControl.#scrollBack ( );
+        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ); } );
+        doc.body.classList.add ( "prevent-scroll" );
+    }
+
+    static prevent ( debounceDuration = 200 ) {
+        if ( this.#scrollable ) {
             const rect = doc.body.getBoundingClientRect ( );
+            [ this.#dx, this.#dy ] = [ rect.x, rect.y ];
+            doc.body.classList.add ( "prevent-scroll" );
             Object.entries ( {
+                "--dx": `${this.#dx}px`,
+                "--dy": `${this.#dy}px`,
                 "--w": `${rect.width}px`,
                 "--h": `${rect.height}px`,
             } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-            doc.body.classList.add ( "prevent-scroll" );
-        }, debounceDuration );
+            this.#handleResize = debounce ( 
+                this.#updateSize, 
+                debounceDuration 
+            );
+            window.addEventListener ( "resize", this.#handleResize );
+            this.#scrollable = false;
+        }
     }
 
-    static recoverScroll ( ) {
-        window.onresize = null;
-        ScrollControl.#scrollBack ( );
+    static recover ( ) {
+        if ( !this.#scrollable ) {
+            this.#scrollBack ( );
+            window.removeEventListener ( "resize", this.#handleResize );
+            this.#handleResize = null;
+            this.#scrollable = true;
+        }
     }
+
+    static get scrollable ( ) { return this.#scrollable; }
 }
 
 // General-Purpose Styles ------------------------
@@ -300,6 +317,8 @@ GM_addStyle (`
 ( function ( ) {
     'use strict';
 
+    const GITHUB_REPO_URL = "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor";
+
     // Auxiliary Functions ========================
     
     // Convert Lyrics to Pure Text ------------------------
@@ -393,6 +412,7 @@ GM_addStyle (`
         "dialog", { 
         id: "mg-lyrics_dialog", 
         cls: "fxp-plugin",
+        autofocus: true,
         data: {
             colorMode: "dark",
         }
@@ -400,7 +420,7 @@ GM_addStyle (`
     dialog.innerHTML = `
     <div id="mg-lyrics_window" class="dialog-window">
         <header id="mg-lyrics_header">
-            <div class="content" draggable = "true">
+            <div class="content">
                 <strong>萌娘百科歌词提取助手</strong>
             </div>
             <div class="buttons">
@@ -433,14 +453,6 @@ GM_addStyle (`
     </div>
     `;
     doc.body.append ( dialog );
-
-    dialog.ondragstart = ( e ) => {
-        //console.log ( e );
-    }
-
-    dialog.ondragover = ( e ) => {
-        //console.log ( e );
-    }
 
     // Important Elements ------------------------
 
@@ -513,22 +525,21 @@ GM_addStyle (`
     }
 
     // Entrance to the tool clicked
-    doc.querySelector ( "#mg-lyrics_link" ).onclick = ( ) => {
-        ScrollControl.preventScroll ( );
-        dialog.showModal ( );
-        if ( lyricsData == null ) { initDialog ( ); }
-    };
+    doc.querySelector ( "#mg-lyrics_link" )
+        .addEventListener ( "click", ( ) => {
+            ScrollControl.prevent ( );
+            dialog.showModal ( );
+            if ( lyricsData == null ) { initDialog ( ); }
+        } );
 
     // Close dialog
-    dialog.querySelector ( "button.close" ).onclick = ( ) => { 
-        dialog.close ( );
-        ScrollControl.recoverScroll ( );
-    }
+    dialog.querySelector ( "button.close" )
+        .addEventListener ( "click", ( ) => { dialog.close ( ); } );
+    dialog.addEventListener ( "close", ( ) => { ScrollControl.recover ( ); } );
 
     // Link to GitHub repo
-    dialog.querySelector ( "#mg-lyrics_button-github" ).onclick = ( ) => {
-        window.open ( "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor" );
-    }
+    dialog.querySelector ( "#mg-lyrics_button-github" )
+        .addEventListener ( "click", ( ) => { window.open ( GITHUB_REPO_URL ); } );
 
     // Additional Stylesheet ------------------------
 
