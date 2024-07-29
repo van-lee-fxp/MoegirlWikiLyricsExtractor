@@ -210,6 +210,20 @@ GM_addStyle (`
     dialog.fxp-plugin > .popover.showing {
         display: block;
     }
+    
+    dialog.fxp-plugin .full-page-prompt {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        inline-size: 100%;
+        block-size: 100%;
+    }
+    
+    dialog.fxp-plugin .full-page-prompt > .prompt-text {
+        font-size: 4em;
+        opacity: 50%;
+    }
 
     dialog.fxp-plugin i[class^="ri-"] {
         font-size: 1.5em;
@@ -457,6 +471,9 @@ GM_addStyle (`
     // Important Elements ------------------------
 
     const lyricsCount = dialog.querySelector ( "#mg-lyrics_count" );
+    const footerContent = dialog.querySelector ( 
+        "dialog > .dialog-window > footer > .content" 
+    );
     const tabsArea = dialog.querySelector ( "#mg-lyrics_tabs" );
     const previewArea = dialog.querySelector ( "#mg-lyrics_preview" );
     const popover = dialog.querySelector ( "#mg-lyrics_popover-success" );
@@ -494,34 +511,44 @@ GM_addStyle (`
     // Building up lyrics content
     const initDialog = ( ) => {
         lyricsData = getPageLyrics ( );
-        lyricsCount.innerText = lyricsData.length.toString ( );
-        lyricsData.forEach ( ( arr, i ) => {
-            const lyrics_group = $ele ( "div", { cls: "lyrics-group" } );
-            tabsArea.innerHTML += `<button class="tab">#${i + 1}</button>`;
-            previewArea.append ( lyrics_group );
-            arr.forEach ( ( lyrics_src, j ) => {
-                const lyrics_box = $ele ( "div", { cls: "lyrics-box" } );
-                lyrics_group.append ( lyrics_box );
-                lyrics_box.innerHTML = `
-                <header class="lyrics-header">
-                    <div class="lyrics-header-text">
-                        #${i + 1}
-                        ${j == 0 ? "原文": "译文"}
-                    </div>
-                    <button class="lyrics-copy-button" title="复制">
-                        <i class="ri-clipboard-line"></i>
-                    </button>
-                </header>
-                <textarea readonly></textarea>
-                `;
-                const textarea = lyrics_box.querySelector ( "textarea" );
-                textarea.append ( lyrics_src );
-                lyrics_box.querySelector ( ".lyrics-copy-button" ).onclick = ( ) => {
-                    GM_setClipboard ( textarea.textContent );
-                    showPopover ( );
-                };
+        const len = lyricsData.length;
+        if ( len > 0 ) {
+            footerContent.innerHTML = `共发现 <data>${len}</data> 段歌词`;
+
+            // Build DOM to display lyrics
+            lyricsData.forEach ( ( arr, i ) => {
+                const lyrics_group = $ele ( "div", { cls: "lyrics-group" } );
+                tabsArea.innerHTML += `<button class="tab">#${i + 1}</button>`;
+                previewArea.append ( lyrics_group );
+                arr.forEach ( ( lyrics_src, j ) => {
+                    const lyrics_box = $ele ( "div", { cls: "lyrics-box" } );
+                    lyrics_group.append ( lyrics_box );
+                    lyrics_box.innerHTML = `
+                    <header class="lyrics-header">
+                        <div class="lyrics-header-text">
+                            #${i + 1}
+                            ${j == 0 ? "原文": "译文"}
+                        </div>
+                        <button class="lyrics-copy-button" title="复制">
+                            <i class="ri-clipboard-line"></i>
+                        </button>
+                    </header>
+                    <textarea readonly></textarea>
+                    `;
+                    const textarea = lyrics_box.querySelector ( "textarea" );
+                    textarea.append ( lyrics_src );
+                    lyrics_box.querySelector ( ".lyrics-copy-button" ).onclick = ( ) => {
+                        GM_setClipboard ( textarea.textContent );
+                        showPopover ( );
+                    };
+                } );
             } );
-        } );
+        } else {
+            const na_box = $ele ( "div", { cls: "full-page-prompt" } );
+            na_box.innerHTML = `<div class="prompt-text">无可用歌词</div>`;
+            previewArea.append ( na_box );
+            footerContent.innerHTML = "当前页面未发现可用歌词";
+        }
     }
 
     // Entrance to the tool clicked
