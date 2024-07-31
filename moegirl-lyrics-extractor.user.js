@@ -1,249 +1,32 @@
 // ==UserScript==
 // @name         MoegirlWiki Lyrics Extractor
-// @name:zh-CN   萌娘百科歌词提取器
-// @namespace    http://tampermonkey.net/
+// @name:zh-CN   萌娘百科歌词提取助手
+// @license      GPLv3
+// @namespace    https://github.com/vanleefxp/
+// @homepageURL  https://github.com/vanleefxp/MoegirlWikiLyricsExtractor
 // @version      2024-07-24
-// @description  将萌娘百科中通过 `LyricsKai` 模板引用的歌词整理成可以直接复制的文本，原文和译文分开。
+// @description:zh-CN  将萌娘百科中通过 `LyricsKai` 模板引用的歌词整理成可以直接复制的文本，原文和译文分开。
 // @author       Van Lee F. X. P.
 // @match        https://*.moegirl.org.cn/*
 // @icon         https://img.moegirl.org.cn/favicon.ico
 // @grant        GM_addStyle
 // @grant        GM_setClipboard
+// @require      https://vanleefxp.github.io/utils/js/shortcuts/shortcuts.js
 // ==/UserScript==
-
-// General-Purpose Code ========================
-
-// General-Purpose Variables and Functions ------------------------
-
-const doc = document;
-
-const $ele = ( name = "div", options = null ) => {
-    const ele = doc.createElement ( name, options );
-    if ( options != null ) {
-        delete options.is;
-        if ( options.hasOwnProperty ( "cls" ) ) {
-            const cls = options.cls;
-            if ( Array.isArray ( cls ) ) {
-                // classes passed as array
-                ele.classList.add ( ...cls );
-            }
-            else {
-                // classes passed as string
-                ele.classList.add ( ...cls.split ( /\s+/g ) );
-            }
-            delete options.cls;
-        }
-        if ( options.hasOwnProperty ( "data" ) ) {
-            // data set
-            Object.assign ( ele.dataset, options.data );
-            delete options.data;
-        }
-        Object.assign ( ele, options );
-    }
-    return ele;
-}
-
-const $text = doc.createTextNode.bind ( doc );
-const $frag = doc.createDocumentFragment.bind ( doc );
-
-// General-Purpose Styles ------------------------
-
-GM_addStyle (`
-    body.prevent-scroll {
-        overflow: hidden;
-    }
-
-    dialog.fxp-plugin {
-        --shadow-color: rgb(0 0 0 / 25%);
-        --fg-success: #00b42a;
-        --bg-error: #e81123;
-
-        inline-size: 50%;
-        block-size: 75%;
-        box-sizing: border-box;
-        padding: 0;
-        border-radius: 5px;
-        border: none;
-        resize: both;
-        color: var(--text-100);
-        background-color: var(--bg-100);
-        filter: drop-shadow(0 0 30px var(--shadow-color));
-        user-select: none;
-        /*overflow: visible;*/
-    }
-
-    dialog.fxp-plugin[data-color-mode="dark"] {
-        --primary-100:#1F3A5F;
-        --primary-200:#4d648d;
-        --primary-300:#acc2ef;
-        --accent-100:#3D5A80;
-        --accent-200:#cee8ff;
-        --text-100:#FFFFFF;
-        --text-200:#e0e0e0;
-        --bg-100:#0F1C2E;
-        --bg-200:#1f2b3e;
-        --bg-300:#374357;
-    }
-
-    dialog.fxp-plugin[data-color-mode="light"] {
-        --primary-100:#d4eaf7;
-        --primary-200:#b6ccd8;
-        --primary-300:#3b3c3d;
-        --accent-100:#71c4ef;
-        --accent-200:#00668c;
-        --text-100:#1d1c1c;
-        --text-200:#313d44;
-        --bg-100:#fffefb;
-        --bg-200:#f5f4f1;
-        --bg-300:#cccbc8;
-    }
-
-    dialog.fxp-plugin::backdrop {
-        background-color: rgb(0 0 0 / 25%);
-        backdrop-filter: blur(3px);
-    }
-
-    dialog.fxp-plugin .variant_success {
-        color: var(--fg-success);
-    }
-    
-    dialog.fxp-plugin > .popover {
-        display: none;
-        position: absolute;
-        border-radius: 5px;
-        padding: 20px;
-        background-color: var(--bg-200);
-        border: 1px solid var(--bg-300);
-        bottom: 20px;
-        right: 20px;
-        filter: drop-shadow(0 0 10px var(--shadow-color));
-    }
-
-    dialog.fxp-plugin > .popover.showing {
-        display: block;
-    }
-    
-    dialog.fxp-plugin .full-page-prompt {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        inline-size: 100%;
-        block-size: 100%;
-    }
-    
-    dialog.fxp-plugin .full-page-prompt > .prompt-text {
-        font-size: 4em;
-        opacity: 50%;
-    }
-
-    dialog.fxp-plugin i[class^="ri-"] {
-        font-size: 1.5em;
-    }
-    
-    dialog.fxp-plugin > .dialog-window {
-        display: grid;
-        grid-template-rows: 
-            [header] auto 
-            [content] 1fr 
-            [footer] auto;
-        block-size: 100%;
-    }
-
-    dialog.fxp-plugin > .dialog-window > header {
-        grid-row: header;
-        border-radius: 5px 5px 0 0;
-    }
-    
-    dialog.fxp-plugin > .dialog-window > .content {
-        grid-row: content;
-        overflow: hidden;
-    }
-    
-    dialog.fxp-plugin > .dialog-window > .content > .content-internal {
-        block-size: 100%;
-    }
-
-    dialog.fxp-plugin > .dialog-window > footer {
-        grid-row: footer;
-        border-radius: 0 0 5px 5px;
-    }
-
-    dialog.fxp-plugin > .dialog-window > :is(header, footer) {
-        display: grid;
-        grid-template-columns: 
-            [content] 1fr 
-            [buttons] auto;
-        grid-auto-flow: column;
-        background-color: var(--bg-300);
-    }
-
-    dialog.fxp-plugin > .dialog-window > :is(header, footer) > .content {
-        grid-column: content;
-        padding: 5px 15px;
-    }
-
-    dialog.fxp-plugin > .dialog-window > :is(header, footer) > .buttons {
-        grid-column: buttons;
-        display: grid;
-        grid-auto-flow: column;
-    }
-    
-    dialog.fxp-plugin > .dialog-window > :is(header, footer) > .buttons > 
-    button {
-        min-inline-size: 40px;
-    }
-
-    dialog.fxp-plugin button {
-        border: none;
-        background-color: transparent;
-        font-family: inherit;
-        font-size: inherit;
-    }
-
-    dialog.fxp-plugin .tabs {
-        display: flex;
-    }
-    
-    dialog.fxp-plugin .tabs > .tab {
-        min-inline-size: 80px;
-        padding: 10px 15px;
-        text-align: start;
-    }
-    
-    dialog.fxp-plugin > .dialog-window > :is(header, footer) > .buttons > 
-    button:hover {
-        background-color: var(--bg-200);
-    }
-
-    dialog.fxp-plugin > .dialog-window > header > .buttons > 
-    button.close, 
-    dialog.fxp-plugin textarea:focus {
-        color: var(--text-100);
-    }
-    
-    dialog.fxp-plugin > .dialog-window > header > .buttons > 
-    button.close:hover {
-        background-color: var(--bg-error);
-    }
-
-    dialog.fxp-plugin textarea {
-        background-color: var(--bg-200);
-    }
-
-    dialog.fxp-plugin :is(button, textarea) {
-        color: var(--text-200);
-    }
-    
-    dialog.fxp-plugin :is(button, textarea):focus {
-        outline: none;
-    }
-`);
 
 ( function ( ) {
     'use strict';
 
-    const GITHUB_REPO_URL = "https://github.com/van-lee-fxp/MoegirlWikiLyricsExtractor";
+    const GITHUB_REPO_URL = "https://github.com/vanleefxp/MoegirlWikiLyricsExtractor";
+
+    addExternalCSS ( 
+        // personal stylesheet
+        "https://vanleefxp.github.io/utils/css/fxp-plugin/fxp-plugin.css",  
+        // additional style for MoegirlWiki user scripts
+        "https://vanleefxp.github.io/utils/css/fxp-plugin/moegirlwiki/moegirlwiki.css",  
+        // RemixIcon
+        "https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css",
+    );
 
     // Auxiliary Functions ========================
     
@@ -296,19 +79,15 @@ GM_addStyle (`
 
     // Main Program ========================
 
-    // DOM Setup ------------------------
+    console.log ( "Enabled: MoegirlWiki Lyrics Extractor" );
 
-    // Add RemixIcon to HTML Head
-    doc.head.append ( $ele ( "link", {
-        href: "https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css",
-        rel: "stylesheet",
-    } ) );
+    // DOM Setup ------------------------
 
     // Add entrance to the tool according to different skins
     if ( doc.body.classList.contains ( "skin-moeskin" ) ) {
         // MoeSkin
         const toolbar = doc.querySelector ( "#moe-global-toolbar.desktop-only" );
-        toolbar.querySelector ( "#p-tb" ).innerHTML += `
+        toolbar.querySelector ( "#p-tb" ).innerHTML += /* html */ `
             <li class="toolbar-link" data-v-f0c8232e>
                 <a 
                     id="mg-lyrics_link" 
@@ -324,7 +103,7 @@ GM_addStyle (`
         // Vector
         doc.querySelector ( "#p-navigation" )
             .after ( doc.querySelector ( "#p-tb" ) ); // move the "Tools" section forward
-        doc.querySelector ( "#p-tb > .body > ul" ).innerHTML += `
+        doc.querySelector ( "#p-tb > .body > ul" ).innerHTML += /* html */ `
             <li>
                 <a id="mg-lyrics_link" title="一键提取 LyricsKai 模板歌词">
                     歌词提取助手
@@ -343,7 +122,7 @@ GM_addStyle (`
             colorMode: "dark",
         }
     } );
-    dialog.innerHTML = `
+    dialog.innerHTML = /* html */ `
     <div id="mg-lyrics_window" class="dialog-window">
         <header id="mg-lyrics_header">
             <div class="content">
@@ -435,7 +214,7 @@ GM_addStyle (`
                 arr.forEach ( ( lyrics_src, j ) => {
                     const lyrics_box = $ele ( "div", { cls: "lyrics-box" } );
                     lyrics_group.append ( lyrics_box );
-                    lyrics_box.innerHTML = `
+                    lyrics_box.innerHTML = /* html */ `
                     <header class="lyrics-header">
                         <div class="lyrics-header-text">
                             #${i + 1}
@@ -486,33 +265,7 @@ GM_addStyle (`
 
     // Additional Stylesheet ------------------------
 
-    GM_addStyle (`
-        dialog#mg-lyrics_dialog[data-color-mode="dark"] {
-            --primary-100:#2E8B57;
-            --primary-200:#61bc84;
-            --primary-300:#c6ffe6;
-            --accent-100:#8FBC8F;
-            --accent-200:#345e37;
-            --text-100:#FFFFFF;
-            --text-200:#e0e0e0;
-            --bg-100:#1E1E1E;
-            --bg-200:#2d2d2d;
-            --bg-300:#454545;
-        }
-
-        dialog#mg-lyrics_dialog[data-color-mode="light"] {
-            --primary-100:#e5efc7;
-            --primary-200:#d8dec2;
-            --primary-300:#728927;
-            --accent-100:#a4c639;
-            --accent-200:#416700;
-            --text-100:#1d1c1c;
-            --text-200:#313d44;
-            --bg-100:#fffefb;
-            --bg-200:#f5f4f1;
-            --bg-300:#cccbc8;
-        }
-
+    GM_addStyle (/* css */`
         #mg-lyrics_main > .content-internal {
             display: grid;
             grid-template-rows: 
