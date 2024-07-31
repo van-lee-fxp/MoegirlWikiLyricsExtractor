@@ -4,14 +4,16 @@
 // @license      GPLv3
 // @namespace    https://github.com/vanleefxp/
 // @homepageURL  https://github.com/vanleefxp/MoegirlWikiLyricsExtractor
-// @version      2024-07-24
+// @version      2024-07-31
 // @description:zh-CN  将萌娘百科中通过 `LyricsKai` 模板引用的歌词整理成可以直接复制的文本，原文和译文分开。
 // @author       Van Lee F. X. P.
-// @match        https://*.moegirl.org.cn/*
+// @match        https://zh.moegirl.org.cn/*
+// @match        https://mzh.moegirl.org.cn/*
 // @icon         https://img.moegirl.org.cn/favicon.ico
 // @grant        GM_addStyle
 // @grant        GM_setClipboard
-// @require      https://vanleefxp.github.io/utils/js/shortcuts/shortcuts.js
+// @require      https://vanleefxp.github.io/utils/js/shortcuts.js
+// @require      https://vanleefxp.github.io/utils/js/moegirlwiki.js
 // ==/UserScript==
 
 ( function ( ) {
@@ -83,35 +85,6 @@
 
     // DOM Setup ------------------------
 
-    // Add entrance to the tool according to different skins
-    if ( doc.body.classList.contains ( "skin-moeskin" ) ) {
-        // MoeSkin
-        const toolbar = doc.querySelector ( "#moe-global-toolbar.desktop-only" );
-        toolbar.querySelector ( "#p-tb" ).innerHTML += /* html */ `
-            <li class="toolbar-link" data-v-f0c8232e>
-                <a 
-                    id="mg-lyrics_link" 
-                    title="一键提取 LyricsKai 模板歌词" 
-                    data-v-f0c8232e
-                >
-                    歌词提取助手
-                </a>
-            </li>
-        `;
-        toolbar.querySelector ( ".toolbar-inner-container" ).style.width = "auto";
-    } else {
-        // Vector
-        doc.querySelector ( "#p-navigation" )
-            .after ( doc.querySelector ( "#p-tb" ) ); // move the "Tools" section forward
-        doc.querySelector ( "#p-tb > .body > ul" ).innerHTML += /* html */ `
-            <li>
-                <a id="mg-lyrics_link" title="一键提取 LyricsKai 模板歌词">
-                    歌词提取助手
-                </a>
-            </li>
-        `;
-    }
-
     // Build up dialog for the tool
     const dialog = $ele ( 
         "dialog", { 
@@ -147,9 +120,7 @@
             </div>
         </div>
         <footer id="mg-lyrics_footer">
-            <div id="mg-lyrics_msg" class="content">
-                共发现 <data id="mg-lyrics_count"></data> 段歌词
-            </div>
+            <div id="mg-lyrics_msg" class="content"></div>
         </footer>
     </div>
     <div class="popover" id="mg-lyrics_popover-success">
@@ -161,7 +132,6 @@
 
     // Important Elements ------------------------
 
-    const lyricsCount = dialog.querySelector ( "#mg-lyrics_count" );
     const footerContent = dialog.querySelector ( 
         "dialog > .dialog-window > footer > .content" 
     );
@@ -243,20 +213,21 @@
     }
 
     // Entrance to the tool clicked
-    doc.querySelector ( "#mg-lyrics_link" )
-        .addEventListener ( "click", ( ) => {
-            doc.body.classList.add ( "prevent-scroll" );
-            //doc.body.style.overflow = "hidden";
-            dialog.showModal ( );
-            if ( lyricsData == null ) { initDialog ( ); }
-        } );
+    MoegirlWiki.addTool ( 
+        "t-lyrics-extractor", 
+        "歌词提取助手", 
+        "一键提取 LyricsKai 模板歌词" 
+    ).addEventListener ( "click", ( ) => {
+        doc.body.classList.add ( "prevent-scroll" );
+        dialog.showModal ( );
+        if ( lyricsData == null ) { initDialog ( ); }
+    } );
 
     // Close dialog
     dialog.querySelector ( "button.close" )
         .addEventListener ( "click", ( ) => { dialog.close ( ); } );
     dialog.addEventListener ( "close", ( ) => {
         doc.body.classList.remove ( "prevent-scroll" ); 
-        //doc.body.style.overflow = "";
     } );
 
     // Link to GitHub repo
