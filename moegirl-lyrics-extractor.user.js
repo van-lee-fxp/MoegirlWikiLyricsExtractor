@@ -46,98 +46,11 @@ const $ele = ( name = "div", options = null ) => {
 const $text = doc.createTextNode.bind ( doc );
 const $frag = doc.createDocumentFragment.bind ( doc );
 
-function debounce ( func, duration = 500 ) {
-    let timerId;
-    return function ( ...args ) {
-        clearTimeout ( timerId );
-        timerId = setTimeout ( 
-            ( ) => { func.apply ( this, args ); }, 
-            duration 
-        );
-    };
-}
-
-function throttle ( func, duration = 500 ) {
-    let timerId = null;
-    return function ( ...args ) {
-        if ( timerId != null ) { return; }
-        timerId = setTimeout ( 
-            ( ) => { 
-                func.apply ( this, args );
-                timerId = null;
-            }, 
-            duration 
-        );
-    }
-}
-
-// Prevent and Recover Scroll ------------------------
-
-class ScrollControl {
-    static #dx = 0;
-    static #dy = 0;
-    static #handleResize = null;
-    static #scrollable = true;
-
-    static #scrollBack ( ) {
-        doc.body.classList.remove ( "prevent-scroll" );
-        doc.documentElement.scrollTo ( -this.#dx, -this.#dy );
-    }
-
-    static #updateSize ( ) {
-        ScrollControl.#scrollBack ( ); // not `this.#scrollBack()`
-        const rect = doc.body.getBoundingClientRect ( );
-        Object.entries ( {
-            "--w": `${rect.width}px`,
-            "--h": `${rect.height}px`,
-        } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ); } );
-        doc.body.classList.add ( "prevent-scroll" );
-    }
-
-    static prevent ( debounceDuration = 200 ) {
-        if ( this.#scrollable ) {
-            const rect = doc.body.getBoundingClientRect ( );
-            [ this.#dx, this.#dy ] = [ rect.x, rect.y ];
-            doc.body.classList.add ( "prevent-scroll" );
-            Object.entries ( {
-                "--dx": `${this.#dx}px`,
-                "--dy": `${this.#dy}px`,
-                "--w": `${rect.width}px`,
-                "--h": `${rect.height}px`,
-            } ).forEach ( ( [ k, v ] ) => { doc.body.style.setProperty ( k, v ) } );
-            this.#handleResize = debounce ( 
-                this.#updateSize, 
-                debounceDuration 
-            );
-            window.addEventListener ( "resize", this.#handleResize );
-            this.#scrollable = false;
-        }
-    }
-
-    static recover ( ) {
-        if ( !this.#scrollable ) {
-            this.#scrollBack ( );
-            window.removeEventListener ( "resize", this.#handleResize );
-            this.#handleResize = null;
-            this.#scrollable = true;
-        }
-    }
-
-    static get scrollable ( ) { return this.#scrollable; }
-}
-
 // General-Purpose Styles ------------------------
 
 GM_addStyle (`
     body.prevent-scroll {
-        position: fixed;
-        background-attachment: fixed;
-        top: var(--dy);
-        left: var(--dx);
-        background-position-x: var(--dx);
-        background-position-y: var(--dy);
-        width: var(--w);
-        height: var(--h);
+        overflow: hidden;
     }
 
     dialog.fxp-plugin {
@@ -155,7 +68,6 @@ GM_addStyle (`
         color: var(--text-100);
         background-color: var(--bg-100);
         filter: drop-shadow(0 0 30px var(--shadow-color));
-        position: relative;
         user-select: none;
         /*overflow: visible;*/
     }
@@ -401,7 +313,7 @@ GM_addStyle (`
                 <a 
                     id="mg-lyrics_link" 
                     title="一键提取 LyricsKai 模板歌词" 
-                    href="#" data-v-f0c8232e
+                    data-v-f0c8232e
                 >
                     歌词提取助手
                 </a>
@@ -414,7 +326,7 @@ GM_addStyle (`
             .after ( doc.querySelector ( "#p-tb" ) ); // move the "Tools" section forward
         doc.querySelector ( "#p-tb > .body > ul" ).innerHTML += `
             <li>
-                <a id="mg-lyrics_link" title="一键提取 LyricsKai 模板歌词" href="#">
+                <a id="mg-lyrics_link" title="一键提取 LyricsKai 模板歌词">
                     歌词提取助手
                 </a>
             </li>
@@ -554,7 +466,8 @@ GM_addStyle (`
     // Entrance to the tool clicked
     doc.querySelector ( "#mg-lyrics_link" )
         .addEventListener ( "click", ( ) => {
-            ScrollControl.prevent ( );
+            doc.body.classList.add ( "prevent-scroll" );
+            //doc.body.style.overflow = "hidden";
             dialog.showModal ( );
             if ( lyricsData == null ) { initDialog ( ); }
         } );
@@ -562,7 +475,10 @@ GM_addStyle (`
     // Close dialog
     dialog.querySelector ( "button.close" )
         .addEventListener ( "click", ( ) => { dialog.close ( ); } );
-    dialog.addEventListener ( "close", ( ) => { ScrollControl.recover ( ); } );
+    dialog.addEventListener ( "close", ( ) => {
+        doc.body.classList.remove ( "prevent-scroll" ); 
+        //doc.body.style.overflow = "";
+    } );
 
     // Link to GitHub repo
     dialog.querySelector ( "#mg-lyrics_button-github" )
